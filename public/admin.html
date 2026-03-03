@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutor Admin - Voting Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        :root {
+            --accent-start: #14b8a6;
+            --accent-end: #06b6d4;
+        }
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 24px;
+        }
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+        }
+        .stat-card i {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+        .stat-card h3 {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        #videoPreview {
+            max-width: 100%;
+            border-radius: 10px;
+            border: 3px solid #20c997;
+        }
+    </style>
+</head>
+<body class="dashboard-body">
+    <aside class="app-sidebar">
+        <div class="brand"><i class="bi bi-person-badge-fill"></i> Tutor Admin</div>
+        <nav class="nav flex-column">
+            <a class="nav-link active" href="admin.html"><i class="bi bi-speedometer2 me-2"></i>Dashboard</a>
+            <a class="nav-link" href="voting.html"><i class="bi bi-check2-square me-2"></i>Voting Page</a>
+            <a class="nav-link" href="javascript:void(0)" onclick="logout()"><i class="bi bi-box-arrow-right me-2"></i>Logout</a>
+        </nav>
+    </aside>
+    <main class="app-main">
+    <nav class="navbar navbar-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand">
+                <i class="bi bi-person-badge-fill"></i> Tutor Admin Dashboard
+            </span>
+            <div class="d-flex align-items-center">
+                <span class="text-white me-3">
+                    <i class="bi bi-person-circle"></i> <span id="adminName"></span> | <span id="className"></span>
+                </span>
+                <button class="btn btn-outline-light btn-sm" onclick="logout()">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-bell-fill"></i> Verification Updates from Super Admin
+                    </div>
+                    <div class="card-body">
+                        <div id="verificationUpdatesContainer">
+                            <p class="text-muted mb-0">No verification updates yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12">
+                <div id="electionDebug" class="alert alert-secondary d-none" role="alert" style="font-size: 0.9rem">
+                    <strong>Election Debug:</strong>
+                    <span id="debugElectionId">ID: -</span> |
+                    <span id="debugElectionStatus">Status: -</span> |
+                    <span id="debugElectionClass">Class: -</span>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body stat-card text-primary">
+                        <i class="bi bi-people-fill"></i>
+                        <h3 id="totalStudents">0</h3>
+                        <p class="mb-0">Registered Students</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body stat-card text-success">
+                        <i class="bi bi-trophy-fill"></i>
+                        <h3 id="totalCandidates">0</h3>
+                        <p class="mb-0">Candidates</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body stat-card text-info">
+                        <i class="bi bi-bar-chart-fill"></i>
+                        <h3 id="electionStatus">Not Started</h3>
+                        <p class="mb-0">Election Status</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-person-plus-fill"></i> Register Student
+                    </div>
+                    <div class="card-body">
+                        <form id="registerStudentForm">
+                            <div class="mb-3">
+                                <label class="form-label">Admission Number</label>
+                                <input type="text" class="form-control" id="admissionNo" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Student Name</label>
+                                <input type="text" class="form-control" id="studentName" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Face Recognition</label>
+                                <div class="text-center mb-2">
+                                    <video id="videoPreview" width="320" height="240" autoplay style="display:none;"></video>
+                                    <canvas id="canvas" style="display:none;"></canvas>
+                                </div>
+                                <button type="button" class="btn btn-secondary w-100 mb-2" id="startCameraBtn">
+                                    <i class="bi bi-camera-fill"></i> Start Camera
+                                </button>
+                                <button type="button" class="btn btn-info w-100" id="captureFaceBtn" style="display:none;">
+                                    <i class="bi bi-camera"></i> Capture Face
+                                </button>
+                                <div id="faceStatus" class="mt-2"></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100" id="registerBtn" disabled>
+                                <i class="bi bi-check-circle"></i> Register Student
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-person-fill-add"></i> Add Candidate
+                    </div>
+                    <div class="card-body">
+                        <form id="addCandidateForm">
+                            <div class="mb-3">
+                                <label class="form-label">Select Student (by Admission No)</label>
+                                <select class="form-select" id="candidateSelect" required>
+                                    <option value="">Choose...</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-plus-circle"></i> Add as Candidate
+                            </button>
+                        </form>
+                        <div id="candidateNotice" class="alert alert-warning d-none mt-3"></div>
+                        <div class="alert alert-info mt-3">
+                            <i class="bi bi-info-circle"></i>
+                            <small>If there are 1-2 candidates, they will be automatically elected. Elections are held only for 3+ candidates.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-people"></i> Registered Students
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Admission No</th>
+                                        <th>Name</th>
+                                        <th>Class</th>
+                                        <th>Face Registered</th>
+                                        <th>Registered At</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="studentsTable">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="bi bi-trophy"></i> Candidates & Results
+                    </div>
+                    <div class="card-body">
+                        <div id="candidatesContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin || 'http://localhost:6008';
+        let currentUser = null;
+        let currentElection = null;
+        let latestCandidateElectionId = null;
+        let stream = null;
+        let capturedFaceData = null;
+
+        const authHeaders = (withJson = false) => {
+            const token = localStorage.getItem('token');
+            const headers = {};
+            if (withJson) headers['Content-Type'] = 'application/json';
+            if (token) headers.Authorization = `Bearer ${token}`;
+            return headers;
+        };
+
+        async function syncElectionStatus() {
+            try {
+                const className = (currentUser.class_name || '').trim();
+                const url = `${API_URL}/api/election/status/class_level?class_name=${encodeURIComponent(className)}`;
+                console.log('[ADMIN] 🔍 Checking election active status for class:', className);
+                
+                const response = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+                if (!response.ok) {
+                    console.error('[ADMIN] ❌ API error:', response.status);
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('[ADMIN] 📊 API response:', data);
+
+                if (!data || !data.election) {
+                    console.log('[ADMIN] ⏳ No election found');
+                    currentElection = null;
+                    return;
+                }
+
+                currentElection = {
+                    _id: data.election._id,
+                    status: data.election.status,
+                    class_name: data.election.class_name,
+                    election_type: data.election.election_type
+                };
+                if (currentElection._id) {
+                    latestCandidateElectionId = currentElection._id;
+                }
+                console.log('[ADMIN] ✅ Election found:', { 
+                    _id: currentElection._id, 
+                    status: currentElection.status,
+                    class_name: currentElection.class_name,
+                    type: currentElection.election_type
+                });
+                
+                // Update debug banner
+                const dbg = document.getElementById('electionDebug');
+                const dbgId = document.getElementById('debugElectionId');
+                const dbgStatus = document.getElementById('debugElectionStatus');
+                const dbgClass = document.getElementById('debugElectionClass');
+                if (dbg && dbgId && dbgStatus && dbgClass) {
+                    dbg.classList.remove('d-none');
+                    dbgId.textContent = `ID: ${currentElection._id ?? '-'}`;
+                    dbgStatus.textContent = `Status: ${currentElection.status ?? '-'}`;
+                    dbgClass.textContent = `Class: ${currentElection.class_name ?? 'GLOBAL'}`;
+                }
+
+                // If election status is ongoing, load candidates (but don't auto-redirect)
+                if (currentElection.status === 'ongoing' || currentElection.status === 'ended') {
+                    loadCandidates();
+                }
+            } catch (error) {
+                console.error('[ADMIN] ❌ Error in syncElectionStatus:', error);
+            }
+        }
+
+        function checkAuth() {
+            const user = localStorage.getItem('user');
+            if (!user) {
+                console.log('[AUTH] No user found, redirecting to login');
+                window.location.href = 'login.html';
+                return;
+            }
+            currentUser = JSON.parse(user);
+            console.log('[AUTH] current user', { username: currentUser.username, role: currentUser.role });
+            if (currentUser.role !== 'tutor_admin') {
+                console.log('[AUTH] not tutor_admin, redirecting to login');
+                window.location.href = 'login.html';
+                return;
+            }
+            document.getElementById('adminName').textContent = currentUser.username;
+            document.getElementById('className').textContent = currentUser.class_name || 'N/A';
+        }
+
+        function logout() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = 'login.html';
+        }
+
+        document.getElementById('startCameraBtn').addEventListener('click', async () => {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('videoPreview');
+                video.srcObject = stream;
+                video.style.display = 'block';
+                document.getElementById('captureFaceBtn').style.display = 'block';
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                alert('Error accessing camera: ' + error.message);
+            }
+        });
+
+        document.getElementById('captureFaceBtn').addEventListener('click', () => {
+            const video = document.getElementById('videoPreview');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            capturedFaceData = canvas.toDataURL('image/jpeg');
+            document.getElementById('faceStatus').innerHTML = '<span class="badge bg-success">Face Captured Successfully!</span>';
+            document.getElementById('registerBtn').disabled = false;
+
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            video.style.display = 'none';
+        });
+
+        document.getElementById('registerStudentForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const admission_no = document.getElementById('admissionNo').value;
+            const name = document.getElementById('studentName').value;
+
+            if (!capturedFaceData) {
+                alert('Please capture face first');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/student/register`, {
+                    method: 'POST',
+                    headers: authHeaders(true),
+                    body: JSON.stringify({
+                        admission_no,
+                        name,
+                        face_image: capturedFaceData
+                    })
+                });
+
+                const data = await response.json();
+                console.log('[STUDENT REGISTER] response', { status: response.status, data });
+
+                if (response.ok && data.success) {
+                    alert('Student registered successfully!');
+                    document.getElementById('registerStudentForm').reset();
+                    capturedFaceData = null;
+                    document.getElementById('faceStatus').innerHTML = '';
+                    document.getElementById('registerBtn').disabled = true;
+                    loadStudents();
+                    loadStats();
+                    // Extra requirement: auto-redirect to voting when class-level election is active
+                    if (currentElection && currentElection.status === 'ongoing') {
+                        window.location.href = 'voting.html';
+                    }
+                } else {
+                    console.error('[STUDENT REGISTER] error', { status: response.status, error: data.error });
+                    alert('Error: ' + (data.error || 'Failed to register student'));
+                }
+            } catch (error) {
+                console.error('[STUDENT REGISTER] exception', error);
+                alert('Error registering student: ' + error.message);
+            }
+        });
+
+        document.getElementById('addCandidateForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const student_id = document.getElementById('candidateSelect').value;
+            if (!student_id) {
+                alert('Please select a student');
+                return;
+            }
+
+            const selectedOption = document.querySelector(`#candidateSelect option[value="${student_id}"]`);
+            const studentName = selectedOption ? selectedOption.textContent : 'Student';
+
+            try {
+                // First, fetch the current election status (optional for pre-start add)
+                const statusUrl = `${API_URL}/api/election/status/class_level?class_name=${encodeURIComponent((currentUser.class_name || '').trim())}`;
+                console.log('[CANDIDATE] 🔍 Fetching election for class:', currentUser.class_name);
+                
+                const statusResponse = await fetch(statusUrl);
+                const statusData = await statusResponse.json();
+
+                const election = statusData.election || null;
+                const electionId = (election && election.status !== 'ended') ? (election._id || election.id) : undefined;
+                
+                // 🔧 FIXED: Allow adding candidates at ANY time (before, during, or after election)
+                // Candidates will be linked to the election when voting starts
+
+                if (election) {
+                    console.log('[CANDIDATE] ✅ Found election:', { electionId, status: election.status, class_name: election.class_name });
+                } else {
+                    console.log('[CANDIDATE] ℹ️ No election found; backend will use/create not_started class-level election');
+                }
+
+                // Show loading state
+                const btn = e.target.querySelector('button[type="submit"]');
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Adding...';
+
+                // Now add the candidate
+                const response = await fetch(`${API_URL}/api/candidate/add`, {
+                    method: 'POST',
+                    headers: authHeaders(true),
+                    body: JSON.stringify({
+                        student_id,
+                        election_id: electionId,
+                        position: 'class_representative'
+                    })
+                });
+
+                const data = await response.json();
+                console.log('[CANDIDATE] Response:', { status: response.status, data });
+
+                // Restore button state
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+
+                if (data.success || response.ok) {
+                    alert(`✅ ${studentName} added as candidate successfully!`);
+                    document.getElementById('addCandidateForm').reset();
+                    currentElection = { _id: data.election_id, status: 'not_started', election_type: 'class_level' };
+                    latestCandidateElectionId = data.election_id;
+                    
+                    // Immediately refresh candidates list
+                    await loadCandidates(data.election_id);
+                    await loadStats();
+                    
+                    // Scroll to candidates section
+                    const candidatesSection = document.getElementById('candidatesContainer');
+                    if (candidatesSection) {
+                        candidatesSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                } else {
+                    console.error('[CANDIDATE] Error:', data.error);
+                    alert('❌ Error: ' + (data.error || 'Failed to add candidate'));
+                }
+            } catch (error) {
+                console.error('[CANDIDATE] Exception:', error);
+                alert('❌ Error adding candidate: ' + error.message);
+                
+                // Restore button state on error
+                const btn = e.target.querySelector('button[type="submit"]');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-plus-circle"></i> Add Candidate';
+                }
+            }
+        });
+
+        async function loadStudents() {
+            try {
+                const response = await fetch(`${API_URL}/api/students/${currentUser.id}`);
+                const data = await response.json();
+
+                const tbody = document.getElementById('studentsTable');
+                const select = document.getElementById('candidateSelect');
+
+                if (data.students && data.students.length > 0) {
+                    tbody.innerHTML = data.students.map(student => `
+                        <tr>
+                            <td>${student.admission_no}</td>
+                            <td>${student.name}</td>
+                            <td>${student.class_name}</td>
+                            <td><span class="badge bg-${student.face_encoding ? 'success' : 'warning'}">${student.face_encoding ? 'Yes' : 'No'}</span></td>
+                            <td>${new Date(student.registered_at).toLocaleString()}</td>
+                        </tr>
+                    `).join('');
+
+                    select.innerHTML = '<option value="">Choose...</option>' +
+                        data.students.map(student => `
+                            <option value="${student._id || student.id}">${student.admission_no} - ${student.name}</option>
+                        `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No students registered yet</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error loading students');
+            }
+        }
+
+        async function loadCandidates(electionIdOverride = null) {
+            const electionId = electionIdOverride || latestCandidateElectionId || (currentElection ? (currentElection._id || currentElection.id) : null);
+            if (!electionId) return;
+
+            latestCandidateElectionId = electionId;
+
+            try {
+                const className = (currentUser.class_name || '').trim().toLowerCase();
+                const response = await fetch(`${API_URL}/api/candidates/${electionId}?class_name=${encodeURIComponent(className)}`);
+                const data = await response.json();
+
+                const container = document.getElementById('candidatesContainer');
+
+                if (data.candidates && data.candidates.length > 0) {
+                    if (currentElection.status === 'ended') {
+                        container.innerHTML = `
+                            <div class="alert alert-success">
+                                <i class="bi bi-check-circle"></i> Election has ended. Results:
+                            </div>
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Candidate</th>
+                                        <th>Admission No</th>
+                                        <th>Votes</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.candidates
+                                        .sort((a, b) => b.vote_count - a.vote_count)
+                                        .map((candidate, index) => {
+                                            const student = candidate.student_id || candidate.students;
+                                            return `
+                                        <tr>
+                                            <td>${index + 1}</td>
+                                            <td>${student ? student.name : 'N/A'}</td>
+                                            <td>${student ? student.admission_no : '-'}</td>
+                                            <td><span class="badge bg-primary">${candidate.vote_count}</span></td>
+                                            <td>${candidate.is_elected ? '<span class="badge bg-success">Elected</span>' : ''}</td>
+                                        </tr>
+                                    `;
+                                        }).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    } else {
+                        container.innerHTML = `
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Candidate Name</th>
+                                        <th>Admission No</th>
+                                        <th>Position</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.candidates.map(candidate => {
+                                        const student = candidate.student_id || candidate.students;
+                                        return `
+                                        <tr>
+                                            <td>${student ? student.name : 'N/A'}</td>
+                                            <td>${student ? student.admission_no : '-'}</td>
+                                            <td>${candidate.position.replace('_', ' ').toUpperCase()}</td>
+                                            <td><span class="badge bg-info">Registered</span></td>
+                                        </tr>
+                                    `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        `;
+                    }
+
+                    document.getElementById('totalCandidates').textContent = data.candidates.length;
+                } else {
+                    container.innerHTML = '<p class="text-muted">No candidates added yet</p>';
+                }
+            } catch (error) {
+                console.error('Error loading candidates');
+            }
+        }
+
+        async function checkElectionStatus() {
+            try {
+                const className = (currentUser.class_name || '').trim();
+                const url = `${API_URL}/api/election/status/class_level?class_name=${encodeURIComponent(className)}`;
+                console.log('[ADMIN] 🔍 Checking election status for class:', className);
+                
+                const response = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+                if (!response.ok) {
+                    console.error('[ADMIN] ❌ API error:', response.status);
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('[ADMIN] 📊 API response:', data);
+
+                const candidateForm = document.getElementById('addCandidateForm');
+                const candidateBtn = candidateForm ? candidateForm.querySelector('button[type="submit"]') : null;
+                const candidateNotice = document.getElementById('candidateNotice');
+
+                if (!data.election) {
+                    console.log('[ADMIN] ⏳ No election found yet');
+                    document.getElementById('electionStatus').textContent = 'Not Started';
+                    document.getElementById('electionStatus').className = 'text-secondary';
+                    currentElection = null;
+                    if (candidateBtn) candidateBtn.disabled = false;
+                    if (candidateNotice) {
+                        candidateNotice.classList.remove('d-none');
+                        candidateNotice.classList.remove('alert-danger');
+                        candidateNotice.classList.add('alert-warning');
+                        candidateNotice.innerHTML = 'No active election yet. You can still add class candidates now; they will be attached to the next class election.';
+                    }
+                    return;
+                }
+
+                currentElection = data.election;
+                console.log('[ADMIN] ✅ Election found:', { 
+                    _id: currentElection._id, 
+                    status: currentElection.status,
+                    class_name: currentElection.class_name
+                });
+                // Update debug banner
+                const dbg = document.getElementById('electionDebug');
+                const dbgId = document.getElementById('debugElectionId');
+                const dbgStatus = document.getElementById('debugElectionStatus');
+                const dbgClass = document.getElementById('debugElectionClass');
+                if (dbg && dbgId && dbgStatus && dbgClass) {
+                    dbg.classList.remove('d-none');
+                    dbgId.textContent = `ID: ${currentElection._id ?? '-'}`;
+                    dbgStatus.textContent = `Status: ${currentElection.status ?? '-'}`;
+                    dbgClass.textContent = `Class: ${currentElection.class_name ?? 'GLOBAL'}`;
+                }
+                
+                const statusEl = document.getElementById('electionStatus');
+
+                if (currentElection.status === 'ongoing') {
+                    statusEl.textContent = 'Ongoing';
+                    statusEl.className = 'text-success';
+                    console.log('[ADMIN] 🎯 Election is ONGOING');
+                    if (candidateBtn) candidateBtn.disabled = false;
+                    if (candidateNotice) candidateNotice.classList.add('d-none');
+                    
+                    // 🔧 FIXED: Auto-redirect tutor admin to voting page when election starts
+                    const lastStatusWasOngoing = sessionStorage.getItem('lastElectionStatusOngoing');
+                    if (lastStatusWasOngoing !== 'true') {
+                        console.log('[ADMIN] 🚀 ELECTION STARTED! Auto-redirecting to voting.html');
+                        sessionStorage.setItem('lastElectionStatusOngoing', 'true');
+                        // Show notification and redirect
+                        setTimeout(() => {
+                            alert('✅ Election has started! Redirecting you to voting page...');
+                            window.location.href = 'voting.html';
+                        }, 500);
+                    }
+                    
+                    loadCandidates();
+                } else if (currentElection.status === 'ended') {
+                    statusEl.textContent = 'Ended';
+                    statusEl.className = 'text-danger';
+                    console.log('[ADMIN] 📋 Election ENDED');
+                    sessionStorage.setItem('lastElectionStatusOngoing', 'false');
+                    if (candidateBtn) candidateBtn.disabled = false;
+                    if (candidateNotice) {
+                        candidateNotice.classList.remove('d-none');
+                        candidateNotice.classList.remove('alert-warning');
+                        candidateNotice.classList.remove('alert-danger');
+                        candidateNotice.classList.add('alert-info');
+                        candidateNotice.innerHTML = 'Election ended. You can add candidates now for the next election cycle before it starts.';
+                    }
+                    loadCandidates();
+                } else {
+                    // not_started
+                    statusEl.textContent = 'Not Started';
+                    statusEl.className = 'text-secondary';
+                    console.log('[ADMIN] ⏳ Election NOT STARTED (candidates allowed)');
+                    sessionStorage.setItem('lastElectionStatusOngoing', 'false');
+                    if (candidateBtn) candidateBtn.disabled = false;
+                    if (candidateNotice) {
+                        candidateNotice.classList.remove('d-none');
+                        candidateNotice.classList.remove('alert-danger');
+                        candidateNotice.classList.remove('alert-info');
+                        candidateNotice.classList.add('alert-warning');
+                        candidateNotice.innerHTML = '<i class="bi bi-info-circle"></i> Election ready. You can add candidates now. Voting will open when the election starts.';
+                    }
+                }
+            } catch (error) {
+                console.error('[ADMIN] ❌ Error checking status:', error);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch(`${API_URL}/api/students/${currentUser.id}`);
+                const data = await response.json();
+                document.getElementById('totalStudents').textContent = data.students.length;
+            } catch (error) {
+                console.error('Error loading stats');
+            }
+        }
+
+        async function loadVerificationUpdates() {
+            try {
+                const response = await fetch(`${API_URL}/api/verification/updates`, {
+                    headers: authHeaders()
+                });
+
+                if (!response.ok) return;
+                const data = await response.json();
+                const container = document.getElementById('verificationUpdatesContainer');
+
+                if (!data.updates || data.updates.length === 0) {
+                    container.innerHTML = '<p class="text-muted mb-0">No verification updates yet.</p>';
+                    return;
+                }
+
+                container.innerHTML = data.updates.map(update => {
+                    const student = update.student_id;
+                    const statusBadge = update.status === 'approved'
+                        ? '<span class="badge bg-success">Approved</span>'
+                        : '<span class="badge bg-danger">Rejected</span>';
+
+                    return `
+                        <div class="alert alert-info d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <strong>${student ? student.name : 'Student'}</strong>
+                                (${update.admission_no}) verification is ${update.status} by Super Admin.
+                            </div>
+                            <div>${statusBadge}</div>
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('[ADMIN] Error loading verification updates:', error);
+            }
+        }
+
+        checkAuth();
+        loadStudents();
+        loadStats();
+        syncElectionStatus();
+        loadVerificationUpdates();
+
+        setInterval(() => {
+            syncElectionStatus();
+            loadVerificationUpdates();
+        }, 3000);
+    </script>
+    </main>
+</body>
+</html>

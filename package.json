@@ -1,0 +1,26 @@
+{
+  "name": "voting-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "start:modular": "node server/index.js",
+    "dev": "node server.js",
+    "build": "echo 'Build completed'",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "smoke": "node test_smoke.js"
+  },
+  "dependencies": {
+    "@vladmandic/face-api": "^1.7.15",
+    "@tensorflow/tfjs": "^4.11.0",
+    "bcryptjs": "^2.4.3",
+    "canvas": "^3.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-validator": "^7.0.1",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.4.0"
+  }
+}

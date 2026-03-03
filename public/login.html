@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voting Management System - Login</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        :root {
+            --accent-start: #4f46e5;
+            --accent-end: #ec4899;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 26px;
+        }
+    </style>
+</head>
+<body class="login-body">
+    <div class="login-container">
+        <div class="login-header">
+            <i class="bi bi-person-check-fill" style="font-size: 52px; color: #a5b4fc;"></i>
+            <h1>Voting Management System</h1>
+            <p>Secure College Election Platform</p>
+        </div>
+
+        <form id="loginForm">
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-person-fill"></i></span>
+                    <input type="text" class="form-control" id="username" placeholder="Enter username" required>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-lock-fill"></i></span>
+                    <input type="password" class="form-control" id="password" placeholder="Enter password" required>
+                </div>
+            </div>
+
+            <div class="alert alert-danger d-none" id="errorAlert"></div>
+
+            <button type="submit" class="btn btn-login">
+                <i class="bi bi-box-arrow-in-right me-2"></i>Login
+            </button>
+        </form>
+
+        <div class="text-center mt-3">
+            <small class="text-muted">Default Admin: superadmin / admin123</small>
+        </div>
+    </div>
+
+    <script>
+        // Prefer current origin; fallback when opened from file://
+        const API_URL = (window.location.protocol === 'file:' || window.location.origin === 'null')
+            ? 'http://localhost:6008'
+            : window.location.origin;
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const errorAlert = document.getElementById('errorAlert');
+            errorAlert.classList.add('d-none');
+
+            try {
+                const response = await fetch(`${API_URL}/api/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+                console.log('login response', { status: response.status, data });
+
+                if (response.ok && data.success) {
+                    // Clear stale session first to avoid role/token mix-ups
+                    localStorage.removeItem('user');
+                    localStorage.removeItem('token');
+
+                    localStorage.setItem('user', JSON.stringify(data.user));
+                    if (data.token) localStorage.setItem('token', data.token);
+
+                    if (data.user.role === 'super_admin') {
+                        window.location.href = 'super-admin.html';
+                    } else if (data.user.role === 'tutor_admin') {
+                        window.location.href = 'admin.html';
+                    } else if (data.user.role === 'staff_advisor') {
+                        window.location.href = 'staff-advisor.html';
+                    } else {
+                        window.location.href = 'login.html';
+                    }
+                } else {
+                    errorAlert.textContent = data.error || 'Invalid credentials';
+                    errorAlert.classList.remove('d-none');
+                }
+            } catch (error) {
+                console.error('login error', error);
+                errorAlert.textContent = 'Connection error. Please try again.';
+                errorAlert.classList.remove('d-none');
+            }
+        });
+    </script>
+</body>
+</html>

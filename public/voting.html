@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voting - Voting Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="ui.css">
+    <style>
+        :root {
+            --accent-start: #4f46e5;
+            --accent-end: #ec4899;
+        }
+        .card-header {
+            font-size: 1.35rem;
+            text-align: center;
+        }
+        .candidate-info {
+            padding: 18px;
+        }
+        .candidate-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+        .btn-vote {
+            padding: 14px 34px;
+            font-size: 1.08rem;
+            border-radius: 12px;
+        }
+        .verification-step {
+            display: none;
+        }
+        .verification-step.active {
+            display: block;
+        }
+        .attempts-warning {
+            background: rgba(120, 53, 15, 0.35);
+            border: 1px solid rgba(251, 191, 36, 0.55);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body class="voting-body">
+    <div class="voting-container">
+        <div class="text-center mb-4">
+            <h1 class="text-white">
+                <i class="bi bi-check2-square"></i> College Election Voting
+            </h1>
+            <p class="text-white">Secure and Transparent Voting System</p>
+        </div>
+
+        <div class="card verification-step active" id="step1">
+            <div class="card-header">
+                <i class="bi bi-person-badge"></i> Step 1: Enter Admission Number
+            </div>
+            <div class="card-body text-center">
+                <form id="admissionForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Admission Number</label>
+                        <input type="text" class="form-control form-control-lg" id="admissionNo"
+                               placeholder="Enter your admission number" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-arrow-right-circle"></i> Continue
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card verification-step" id="step2">
+            <div class="card-header">
+                <i class="bi bi-camera-fill"></i> Step 2: Face Verification
+            </div>
+            <div class="card-body text-center">
+                <p class="mb-3">Please position your face in the camera for verification</p>
+                <div class="mb-3">
+                    <button class="btn btn-primary" id="openCameraBtn" type="button" data-bs-toggle="modal" data-bs-target="#cameraModal">
+                        <i class="bi bi-camera-video-fill me-2"></i>Open Camera Preview
+                    </button>
+                    <canvas id="canvas" style="display:none;"></canvas>
+                </div>
+                <div id="attemptsInfo" class="attempts-warning d-none">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <span id="attemptsText"></span>
+                </div>
+                <p class="text-muted">Camera opens in modal. Click verify after preview starts.</p>
+            </div>
+        </div>
+
+        <div class="card verification-step" id="step3">
+            <div class="card-header">
+                <i class="bi bi-ballot"></i> Step 3: Cast Your Vote
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Instructions:</strong> You can vote for up to 2 candidates. Click on the candidates to select them.
+                </div>
+                <div id="candidatesContainer">
+                    <p class="text-center text-muted">Loading candidates...</p>
+                </div>
+                <div class="text-center mt-4">
+                    <button class="btn btn-vote" id="submitVoteBtn" disabled>
+                        <i class="bi bi-check2-all"></i> Submit Vote
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card verification-step" id="step4">
+            <div class="card-header">
+                <i class="bi bi-check-circle-fill"></i> Vote Submitted Successfully!
+            </div>
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 80px;"></i>
+                <h3 class="mt-3">Thank You for Voting!</h3>
+                <p class="text-muted">Your vote has been recorded securely.</p>
+                <button class="btn btn-primary mt-3" onclick="window.location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i> Allow Another Voter
+                </button>
+            </div>
+        </div>
+
+        <div class="modal fade" id="cameraModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><i class="bi bi-camera-fill me-2"></i>Face Verification Camera</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <video id="videoPreview" autoplay></video>
+                        <div class="mt-3">
+                            <button class="btn btn-primary" id="verifyFaceBtn" type="button">
+                                <i class="bi bi-check-circle me-2"></i>Verify Face
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer"></div>
+    </div>
+
+    <script>
+        const API_URL = (window.location.origin && window.location.origin.startsWith('file'))
+            ? 'http://localhost:6008'
+            : (window.location.origin || 'http://localhost:6008');
+        let currentStudent = null;
+        let currentElection = null;
+        let selectedCandidates = [];
+        let stream = null;
+        let verificationAttempts = 0;
+        let adminUser = null;
+        let candidatesLoadAttempts = 0;
+        const MAX_CANDIDATE_LOAD_ATTEMPTS = 3;
+        let lastLoadedElectionId = null;
+        let candidatesLoadedOnce = false;
+        let studentClassName = null;
+        let cameraModal = null;
+
+        adminUser = JSON.parse(localStorage.getItem('user'));
+
+        async function syncElectionStatus(classNameOverride = null) {
+            try {
+                console.log('[VOTING] 🔍 Checking active election');
+                const url = `${API_URL}/api/election/active`;
+                const response = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+                const data = await response.json();
+
+                console.log('[VOTING] 📊 Raw API response:', data);
+
+                if (!data || data.status !== 'ongoing' || !data.electionId) {
+                    console.error('[VOTING] ❌ No active election in response:', data);
+                    currentElection = null;
+                    
+                    // If user is an admin, redirect them
+                    if (adminUser) {
+                        if (adminUser.role === 'tutor_admin') {
+                            console.log('[VOTING] Redirecting tutor_admin to admin.html');
+                            window.location.href = 'admin.html';
+                        } else if (adminUser.role === 'staff_advisor') {
+                            console.log('[VOTING] Redirecting staff_advisor to staff-advisor.html');
+                            window.location.href = 'staff-advisor.html';
+                        }
+                    }
+                    return;
+                }
+
+                // Store the election from the unified active endpoint
+                currentElection = {
+                    _id: data.electionId,
+                    status: data.status,
+                    class_name: data.class_name,
+                    election_type: data.election_type
+                };
+
+                if (adminUser) {
+                    const isClassElection = currentElection.election_type === 'class_level';
+                    const isSecondaryElection = currentElection.election_type === 'secondary_level';
+
+                    if (isClassElection && adminUser.role !== 'tutor_admin') {
+                        window.location.href = 'staff-advisor.html';
+                        return;
+                    }
+
+                    if (isSecondaryElection && adminUser.role !== 'staff_advisor') {
+                        window.location.href = 'admin.html';
+                        return;
+                    }
+                }
+
+                console.log('[VOTING] ✅ Election stored:', {
+                    _id: currentElection._id,
+                    status: currentElection.status,
+                    type: currentElection.election_type
+                });
+
+                // Load candidates ONLY if election is ongoing
+                if (currentElection.status === 'ongoing') {
+                    // Avoid reloading repeatedly for the same election once loaded/exhausted
+                    if (!candidatesLoadedOnce || lastLoadedElectionId !== currentElection._id) {
+                        console.log('[VOTING] 🎯 Election is ONGOING - Loading candidates...');
+                        loadCandidates();
+                    } else {
+                        console.log('[VOTING] ✅ Candidates already loaded for this election, skipping reload');
+                    }
+                } else {
+                    console.log('[VOTING] ℹ️ Election status is ' + currentElection.status + ', not loading candidates yet');
+                    
+                    // Redirect if election ended (avoid disruptive popup)
+                    if (currentElection.status === 'ended' && adminUser) {
+                        if (adminUser.role === 'tutor_admin') {
+                            console.log('[VOTING] Redirecting tutor_admin to admin.html');
+                            window.location.href = 'admin.html';
+                        } else if (adminUser.role === 'staff_advisor') {
+                            console.log('[VOTING] Redirecting staff_advisor to staff-advisor.html');
+                            window.location.href = 'staff-advisor.html';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('[VOTING] ❌ Error checking election status:', error);
+            }
+        }
+
+        async function checkElectionStatus(classNameOverride = null) {
+            try {
+                const className = classNameOverride || studentClassName || '';
+                const url = `${API_URL}/api/election/status/class_level?class_name=${encodeURIComponent(className)}`;
+                console.log('[VOTING] 🔍 Checking election status for class:', className);
+                
+                const response = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+                if (!response.ok) {
+                    console.error('[VOTING] ❌ API error:', response.status);
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('[VOTING] 📊 API response:', data);
+
+                if (!data.election) {
+                    console.log('[VOTING] ⏳ No election found yet');
+                    currentElection = null;
+                    return;
+                }
+
+                currentElection = {
+                    _id: data.election._id,
+                    status: data.election.status,
+                    class_name: data.election.class_name,
+                    election_type: data.election.election_type
+                };
+                console.log('[VOTING] ✅ Election found:', { 
+                    _id: currentElection._id, 
+                    status: currentElection.status,
+                    class_name: currentElection.class_name
+                });
+            } catch (error) {
+                console.error('[VOTING] ❌ Error in checkElectionStatus:', error);
+            }
+        }
+
+        document.getElementById('admissionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const admissionNo = document.getElementById('admissionNo').value.trim().toLowerCase();
+
+            try {
+                console.log('[VOTING] Fetching all students from:', `${API_URL}/api/students/all`);
+                const response = await fetch(`${API_URL}/api/students/all`);
+                
+                if (!response.ok) {
+                    console.error('[VOTING] API error:', response.status, response.statusText);
+                    alert(`Error: Unable to fetch students (HTTP ${response.status}). Please check if server is running.`);
+                    return;
+                }
+                
+                const data = await response.json();
+                console.log('[VOTING] Students fetched:', data.students ? data.students.length : 0);
+
+                if (!data.students || !Array.isArray(data.students)) {
+                    console.error('[VOTING] Invalid response format:', data);
+                    alert('Error: Server returned invalid data. Please try again.');
+                    return;
+                }
+
+                const student = data.students.find(s => (s.admission_no || '').toLowerCase() === admissionNo);
+
+                if (!student) {
+                    alert('Student not found. Please check your admission number.');
+                    return;
+                }
+
+                currentStudent = { ...student, id: student._id || student.id };
+                studentClassName = currentStudent.class_name;
+
+                // Refresh election status with the student's class to avoid mismatched election IDs
+                await checkElectionStatus(studentClassName);
+                
+                // Check if student has approved verification request
+                const hasApproval = await checkVerificationApproval(currentStudent.admission_no);
+                
+                if (hasApproval) {
+                    console.log('[VOTING] Student has approved verification, skipping face detection');
+                    alert('Your verification has been approved. Proceeding to voting...');
+                    await loadCandidates();
+                    showStep(3);
+                } else {
+                    console.log('[VOTING] No approval found, proceeding with face verification');
+                    showStep(2);
+                    startCamera();
+                }
+            } catch (error) {
+                console.error('[VOTING] Error in admission form:', error);
+                alert(`Error verifying student: ${error.message}`);
+            }
+        });
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toastId = `toast-${Date.now()}`;
+            const bgClass = type === 'success' ? 'text-bg-success' : type === 'error' ? 'text-bg-danger' : 'text-bg-primary';
+            const html = `
+                <div id="${toastId}" class="toast custom-toast ${bgClass}" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="toast-body">${message}</div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+            const toastEl = document.getElementById(toastId);
+            const bsToast = new bootstrap.Toast(toastEl, { delay: 2500 });
+            bsToast.show();
+            toastEl.addEventListener('hidden.bs.toast', () => toastEl.remove());
+        }
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('videoPreview').srcObject = stream;
+            } catch (error) {
+                showToast('Camera access denied. Please enable camera to proceed.', 'error');
+            }
+        }
+
+        const cameraModalEl = document.getElementById('cameraModal');
+        cameraModalEl.addEventListener('shown.bs.modal', () => startCamera());
+        cameraModalEl.addEventListener('hidden.bs.modal', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+
+        document.getElementById('verifyFaceBtn').addEventListener('click', async () => {
+            const video = document.getElementById('videoPreview');
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+
+            const faceData = canvas.toDataURL('image/jpeg');
+
+            try {
+                verificationAttempts++;
+                console.log('[VOTING] Verifying face, attempt:', verificationAttempts);
+                
+                const response = await fetch(`${API_URL}/api/student/verify-face`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        admission_no: currentStudent.admission_no,
+                        face_encoding: faceData,
+                        attempt: verificationAttempts
+                    })
+                });
+
+                const data = await response.json();
+                console.log('[VOTING] Verification response:', data);
+
+                if (data.verified) {
+                    console.log('[VOTING] Face verified successfully');
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                    if (!cameraModal) cameraModal = bootstrap.Modal.getOrCreateInstance(cameraModalEl);
+                    cameraModal.hide();
+                    showToast('Face verified successfully.', 'success');
+                    await loadCandidates();
+                    showStep(3);
+                } else {
+                    if (data.attempts_remaining === false || verificationAttempts >= 3) {
+                        console.log('[VOTING] Max attempts reached, requesting manual verification');
+                        await requestManualVerification();
+                    } else {
+                        const attemptsInfo = document.getElementById('attemptsInfo');
+                        const attemptsText = document.getElementById('attemptsText');
+                        attemptsInfo.classList.remove('d-none');
+                        const remaining = 3 - verificationAttempts;
+                        attemptsText.textContent = `Face verification failed. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`;
+                        showToast(`Verification failed. ${remaining} attempt(s) remaining.`, 'error');
+                        console.log('[VOTING] Verification failed, attempts remaining:', remaining);
+                    }
+                }
+            } catch (error) {
+                console.error('[VOTING] Verification error:', error);
+                showToast('Error during face verification. Please try again.', 'error');
+            }
+        });
+
+        async function checkVerificationApproval(admissionNo) {
+            try {
+                const response = await fetch(`${API_URL}/api/verification/status/${admissionNo}`);
+                if (!response.ok) return false;
+                
+                const data = await response.json();
+                return data.approved === true;
+            } catch (error) {
+                console.error('[VOTING] Error checking verification approval:', error);
+                return false;
+            }
+        }
+
+        async function requestManualVerification() {
+            try {
+                const response = await fetch(`${API_URL}/api/verification/request`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        student_id: currentStudent.id,
+                        admission_no: currentStudent.admission_no,
+                        tutor_id: currentStudent.tutor_id
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showToast('Verification request sent to Super Admin.', 'info');
+
+                    const checkInterval = setInterval(async () => {
+                        const hasApproval = await checkVerificationApproval(currentStudent.admission_no);
+                        
+                        if (hasApproval) {
+                            clearInterval(checkInterval);
+                            console.log('[VOTING] Verification approved by Super Admin');
+                            showToast('Verification approved. You can now vote.', 'success');
+                            if (stream) {
+                                stream.getTracks().forEach(track => track.stop());
+                            }
+                            await loadCandidates();
+                            showStep(3);
+                        }
+                    }, 3000);
+                }
+            } catch (error) {
+                console.error('[VOTING] Error requesting verification:', error);
+                showToast('Error requesting verification.', 'error');
+            }
+        }
+
+        async function loadCandidates() {
+            if (!currentElection) {
+                console.error('[VOTING] ❌ Cannot load candidates: currentElection is NULL');
+                console.error('[VOTING] currentElection value:', currentElection);
+                return;
+            }
+
+            try {
+                // Use _id which is the MongoDB ObjectId
+                const electionId = currentElection._id;
+                
+                if (!electionId) {
+                    console.error('[VOTING] ❌ Cannot load candidates: electionId is undefined', {
+                        currentElection,
+                        _id: currentElection._id,
+                        id: currentElection.id
+                    });
+                    return;
+                }
+
+                console.log('[VOTING] 📥 Fetching candidates for election ID:', electionId);
+                
+                // If this is a secondary election, check if student is an elected representative
+                if (currentElection.election_type === 'secondary_level') {
+                    console.log('[VOTING] Checking if student is an elected representative...');
+                    const repCheckResponse = await fetch(`${API_URL}/api/check-representative/${currentStudent.id}`);
+                    const repData = await repCheckResponse.json();
+                    
+                    if (!repData.isRepresentative) {
+                        console.error('[VOTING] ❌ Student is not an elected representative');
+                        alert('Only elected class representatives can vote in secondary level elections.');
+                        window.location.reload();
+                        return;
+                    }
+                    console.log('[VOTING] ✅ Student is an elected representative, can vote');
+                }
+                candidatesLoadAttempts++;
+
+                // Check if student has already voted
+                const voteCountResponse = await fetch(`${API_URL}/api/vote/count`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        voter_id: currentStudent.id,
+                        election_id: electionId
+                    })
+                });
+
+                const voteCountData = await voteCountResponse.json();
+                console.log('[VOTING] Current vote count:', voteCountData.vote_count);
+
+                if (voteCountData.vote_count >= 2) {
+                    alert('You have already cast your votes!');
+                    showStep(4);
+                    return;
+                }
+
+                const classFilter = currentElection.election_type === 'class_level'
+                    ? `?class_name=${encodeURIComponent((currentStudent.class_name || '').toLowerCase())}`
+                    : '';
+                const response = await fetch(`${API_URL}/api/candidates/${electionId}${classFilter}`);
+                const data = await response.json();
+
+                console.log('[VOTING] 📦 Candidates response received:', {
+                    candidateCount: data.candidates?.length || 0,
+                    data: data
+                });
+
+                const container = document.getElementById('candidatesContainer');
+
+                if (data.candidates && data.candidates.length > 0) {
+                    console.log('[VOTING] ✅ Found', data.candidates.length, 'candidates - Rendering');
+                    candidatesLoadAttempts = 0; // Reset on success
+                    candidatesLoadedOnce = true;
+                    lastLoadedElectionId = electionId;
+                    
+                    container.innerHTML = data.candidates.map(candidate => {
+                        const candidateId = candidate._id;
+                        const student = candidate.student_id;
+                        return `
+                        <div class="candidate-card" onclick="toggleCandidate('${candidateId}', this)">
+                            <div class="candidate-info">
+                                <div class="candidate-name">
+                                    <i class="bi bi-person-circle"></i> ${student ? student.name : 'N/A'}
+                                </div>
+                                <div class="candidate-admission">
+                                    Admission No: ${student ? student.admission_no : '-'}
+                                </div>
+                                <div class="candidate-admission">
+                                    Position: ${candidate.position.replace('_', ' ').toUpperCase()}
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                } else {
+                    console.warn('[VOTING] ⚠️  No candidates found for election:', electionId);
+                    
+                    if (candidatesLoadAttempts >= MAX_CANDIDATE_LOAD_ATTEMPTS) {
+                        console.error('[VOTING] ❌ Max attempts reached. Showing error message.');
+                        container.innerHTML = `
+                            <div class="alert alert-danger">
+                                <i class="bi bi-exclamation-triangle-fill"></i>
+                                <strong>No Candidates Available</strong>
+                                <p class="mb-0">No candidates have been registered for this election yet. Please contact your class admin or wait for candidates to be added.</p>
+                            </div>
+                        `;
+                        candidatesLoadedOnce = true;
+                        lastLoadedElectionId = electionId;
+                        // Stop further reloads for this election
+                        candidatesLoadedOnce = true;
+                        lastLoadedElectionId = electionId;
+                    } else {
+                        console.log('[VOTING] 🔄 Retrying candidate load... Attempt ' + candidatesLoadAttempts + '/' + MAX_CANDIDATE_LOAD_ATTEMPTS);
+                        container.innerHTML = `
+                            <div class="alert alert-warning">
+                                <i class="bi bi-clock"></i> Loading candidates... (Attempt ${candidatesLoadAttempts}/${MAX_CANDIDATE_LOAD_ATTEMPTS})
+                            </div>
+                        `;
+                        // Retry after 2 seconds
+                        setTimeout(() => loadCandidates(), 2000);
+                    }
+                }
+            } catch (error) {
+                console.error('[VOTING] ❌ Error loading candidates:', error);
+                const container = document.getElementById('candidatesContainer');
+                container.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle"></i> 
+                        <strong>Error loading candidates</strong>
+                        <p class="mb-0">${error.message || 'Please try again later.'}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleCandidate(candidateId, element) {
+            if (element.classList.contains('selected')) {
+                element.classList.remove('selected');
+                selectedCandidates = selectedCandidates.filter(id => id !== candidateId);
+            } else {
+                if (selectedCandidates.length >= 2) {
+                    alert('You can only select up to 2 candidates');
+                    return;
+                }
+                element.classList.add('selected');
+                selectedCandidates.push(candidateId);
+            }
+
+            document.getElementById('submitVoteBtn').disabled = selectedCandidates.length === 0;
+        }
+
+        document.getElementById('submitVoteBtn').addEventListener('click', async () => {
+            if (selectedCandidates.length === 0) {
+                alert('Please select at least one candidate');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to submit your vote for ${selectedCandidates.length} candidate(s)?`)) {
+                return;
+            }
+
+            try {
+                for (const candidateId of selectedCandidates) {
+                    const voteResponse = await fetch(`${API_URL}/api/vote/cast`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            voter_id: currentStudent.id,
+                            candidate_id: candidateId,
+                            election_id: currentElection._id
+                        })
+                    });
+                    
+                    const voteData = await voteResponse.json();
+                    console.log('[VOTING] Vote cast response:', voteData);
+                    
+                    if (!voteData.success) {
+                        throw new Error(voteData.error || 'Failed to cast vote');
+                    }
+                }
+
+                showToast('Vote submitted successfully.', 'success');
+                showStep(4);
+            } catch (error) {
+                console.error('[VOTING] Error submitting vote:', error);
+                showToast('Error submitting vote: ' + (error.message || 'Unknown error'), 'error');
+            }
+        });
+
+        function showStep(stepNumber) {
+            document.querySelectorAll('.verification-step').forEach(step => {
+                step.classList.remove('active');
+            });
+            document.getElementById(`step${stepNumber}`).classList.add('active');
+        }
+
+        syncElectionStatus();
+        
+        // Refresh election status every 5 seconds
+        setInterval(() => {
+            syncElectionStatus(studentClassName);
+        }, 5000);
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
