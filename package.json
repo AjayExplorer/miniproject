@@ -12,8 +12,9 @@
     "smoke": "node test_smoke.js"
   },
   "dependencies": {
-    "@vladmandic/face-api": "^1.7.15",
     "@tensorflow/tfjs": "^4.11.0",
+    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
     "bcryptjs": "^2.4.3",
     "canvas": "^3.2.0",
     "cors": "^2.8.5",
