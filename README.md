@@ -87,7 +87,7 @@ Pure JavaScript (No native build tools required)
 
 📂 Project Setup Guide
 1️⃣ Clone the Repository
-git clone <your-repository-link>
+git clone "https://github.com/AjayExplorer/Miniproject.git"
 cd voting-management-system
 2️⃣ Install Dependencies
 npm install

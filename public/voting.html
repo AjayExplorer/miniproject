@@ -41,15 +41,64 @@
             border-radius: 10px;
             margin: 10px 0;
         }
+        .camera-modal .modal-content {
+            border: 0;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .camera-modal .modal-header {
+            background: linear-gradient(135deg, var(--accent-start), var(--accent-end));
+            color: #fff;
+            border-bottom: 0;
+        }
+        .camera-modal .btn-close {
+            filter: invert(1);
+        }
+        .camera-frame {
+            position: relative;
+            width: 100%;
+            max-width: 440px;
+            aspect-ratio: 4 / 3;
+            margin: 0 auto;
+            border-radius: 14px;
+            padding: 10px;
+            background: linear-gradient(160deg, rgba(79, 70, 229, 0.18), rgba(236, 72, 153, 0.16));
+            border: 1px solid rgba(79, 70, 229, 0.32);
+            box-shadow: 0 12px 28px rgba(79, 70, 229, 0.16);
+        }
+        #videoPreview {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+            background: #111827;
+            display: block;
+        }
+        .face-guide {
+            position: absolute;
+            inset: 50% auto auto 50%;
+            transform: translate(-50%, -50%);
+            width: 54%;
+            height: 72%;
+            border-radius: 999px;
+            border: 2px dashed rgba(255, 255, 255, 0.9);
+            box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.22);
+            pointer-events: none;
+        }
+        .camera-tip {
+            font-size: 0.92rem;
+            color: #6b7280;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body class="voting-body">
     <div class="voting-container">
         <div class="text-center mb-4">
-            <h1 class="text-white">
+            <h1 class="text-black fw-bold">
                 <i class="bi bi-check2-square"></i> College Election Voting
             </h1>
-            <p class="text-white">Secure and Transparent Voting System</p>
+            <p class="text-black">Secure and Transparent Voting System</p>
         </div>
 
         <div class="card verification-step active" id="step1">
@@ -97,7 +146,7 @@
             <div class="card-body">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i>
-                    <strong>Instructions:</strong> Class-level: vote exactly 2 candidates or select NOTA. Secondary-level: one vote per position.
+                    <strong>Instructions:</strong> Class-level: vote exactly 2 candidates or select NOTA. Secondary-level: one vote per position (or NOTA per position).
                 </div>
                 <div id="candidatesContainer">
                     <p class="text-center text-muted">Loading candidates...</p>
@@ -124,15 +173,19 @@
             </div>
         </div>
 
-        <div class="modal fade" id="cameraModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
+        <div class="modal fade camera-modal" id="cameraModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title"><i class="bi bi-camera-fill me-2"></i>Face Verification Camera</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body text-center">
-                        <video id="videoPreview" autoplay></video>
+                        <div class="camera-frame">
+                            <video id="videoPreview" autoplay playsinline></video>
+                            <div class="face-guide"></div>
+                        </div>
+                        <p class="camera-tip">Keep your face centered inside the oval box before clicking verify.</p>
                         <div class="mt-3">
                             <button class="btn btn-primary" id="verifyFaceBtn" type="button">
                                 <i class="bi bi-check-circle me-2"></i>Verify Face
@@ -545,6 +598,12 @@
                         showStep(4);
                         return;
                     }
+                } else if (currentElection.election_type === 'secondary_level') {
+                    if ((voteCountData.vote_count || 0) > 0) {
+                        alert('You have already cast your vote(s)!');
+                        showStep(4);
+                        return;
+                    }
                 }
 
                 const classFilter = currentElection.election_type === 'class_level'
@@ -566,32 +625,79 @@
                     candidatesLoadedOnce = true;
                     lastLoadedElectionId = electionId;
                     
-                    container.innerHTML = data.candidates.map(candidate => {
-                        const candidateId = candidate._id;
-                        const student = candidate.student_id;
-                        const position = candidate.position || 'general';
-                        return `
-                        <div class="candidate-card"
-                             data-candidate-id="${candidateId}"
-                             data-position="${position}"
-                             data-is-nota="false"
-                             onclick="toggleCandidate(this)">
-                            <div class="candidate-info">
-                                <div class="candidate-name">
-                                    <i class="bi bi-person-circle"></i> ${student ? student.name : 'N/A'}
+                    if (currentElection.election_type === 'secondary_level') {
+                        // Group candidates by position and render with per-position NOTA
+                        const byPosition = {};
+                        data.candidates.forEach(candidate => {
+                            const pos = candidate.position || 'general';
+                            if (!byPosition[pos]) byPosition[pos] = [];
+                            byPosition[pos].push(candidate);
+                        });
+                        let html = '';
+                        for (const [pos, posCandidates] of Object.entries(byPosition)) {
+                            html += `<h6 class="mt-3 mb-2 text-primary fw-bold border-bottom pb-1">${pos.replace(/_/g, ' ').toUpperCase()}</h6>`;
+                            posCandidates.forEach(candidate => {
+                                const candidateId = candidate._id;
+                                const student = candidate.student_id;
+                                html += `
+                                <div class="candidate-card"
+                                     data-candidate-id="${candidateId}"
+                                     data-position="${pos}"
+                                     data-is-nota="false"
+                                     onclick="toggleCandidate(this)">
+                                    <div class="candidate-info">
+                                        <div class="candidate-name">
+                                            <i class="bi bi-person-circle"></i> ${student ? student.name : 'N/A'}
+                                        </div>
+                                        <div class="candidate-admission">
+                                            Admission No: ${student ? student.admission_no : '-'}
+                                        </div>
+                                    </div>
+                                </div>`;
+                            });
+                            html += `
+                            <div class="candidate-card border-warning"
+                                 data-candidate-id="nota_${pos}"
+                                 data-position="${pos}"
+                                 data-is-nota="true"
+                                 onclick="toggleCandidate(this)">
+                                <div class="candidate-info">
+                                    <div class="candidate-name text-warning">
+                                        <i class="bi bi-slash-circle"></i> NOTA (None Of The Above)
+                                    </div>
+                                    <div class="candidate-admission">
+                                        No vote for ${pos.replace(/_/g, ' ').toUpperCase()}
+                                    </div>
                                 </div>
-                                <div class="candidate-admission">
-                                    Admission No: ${student ? student.admission_no : '-'}
-                                </div>
-                                <div class="candidate-admission">
-                                    Position: ${candidate.position.replace('_', ' ').toUpperCase()}
+                            </div>`;
+                        }
+                        container.innerHTML = html;
+                    } else {
+                        container.innerHTML = data.candidates.map(candidate => {
+                            const candidateId = candidate._id;
+                            const student = candidate.student_id;
+                            const position = candidate.position || 'general';
+                            return `
+                            <div class="candidate-card"
+                                 data-candidate-id="${candidateId}"
+                                 data-position="${position}"
+                                 data-is-nota="false"
+                                 onclick="toggleCandidate(this)">
+                                <div class="candidate-info">
+                                    <div class="candidate-name">
+                                        <i class="bi bi-person-circle"></i> ${student ? student.name : 'N/A'}
+                                    </div>
+                                    <div class="candidate-admission">
+                                        Admission No: ${student ? student.admission_no : '-'}
+                                    </div>
+                                    <div class="candidate-admission">
+                                        Position: ${candidate.position.replace('_', ' ').toUpperCase()}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        `;
-                    }).join('');
-
-                    if (currentElection.election_type === 'class_level') {
+                            `;
+                        }).join('');
+                        // Add NOTA card for class-level
                         container.insertAdjacentHTML('beforeend', `
                             <div class="candidate-card border-warning"
                                  data-candidate-id="nota"
@@ -691,6 +797,27 @@
                 return;
             }
 
+            // Secondary-level NOTA per position
+            if (isNota) {
+                if (selectedSecondaryByPosition[position] === 'nota') {
+                    // Deselect NOTA
+                    delete selectedSecondaryByPosition[position];
+                    element.classList.remove('selected');
+                } else {
+                    // Deselect any candidate previously selected for this position
+                    const prevCandidate = selectedSecondaryByPosition[position];
+                    if (prevCandidate && prevCandidate !== 'nota') {
+                        const prevCard = document.querySelector(`.candidate-card[data-candidate-id="${prevCandidate}"]`);
+                        if (prevCard) prevCard.classList.remove('selected');
+                        selectedCandidates = selectedCandidates.filter(id => id !== prevCandidate);
+                    }
+                    selectedSecondaryByPosition[position] = 'nota';
+                    element.classList.add('selected');
+                }
+                document.getElementById('submitVoteBtn').disabled = Object.keys(selectedSecondaryByPosition).length === 0;
+                return;
+            }
+
             if (element.classList.contains('selected')) {
                 element.classList.remove('selected');
                 selectedCandidates = selectedCandidates.filter(id => id !== candidateId);
@@ -698,7 +825,13 @@
                     delete selectedSecondaryByPosition[position];
                 }
             } else {
-                if (selectedSecondaryByPosition[position] && selectedSecondaryByPosition[position] !== candidateId) {
+                const prevSelection = selectedSecondaryByPosition[position];
+                if (prevSelection === 'nota') {
+                    // Deselect NOTA for this position when a candidate is selected
+                    const notaCard = document.querySelector(`.candidate-card[data-position="${position}"][data-is-nota="true"]`);
+                    if (notaCard) notaCard.classList.remove('selected');
+                    delete selectedSecondaryByPosition[position];
+                } else if (prevSelection && prevSelection !== candidateId) {
                     alert('1 vote for each position');
                     return;
                 }
@@ -707,7 +840,7 @@
                 selectedSecondaryByPosition[position] = candidateId;
             }
 
-            document.getElementById('submitVoteBtn').disabled = selectedCandidates.length === 0;
+            document.getElementById('submitVoteBtn').disabled = Object.keys(selectedSecondaryByPosition).length === 0;
         }
 
         document.getElementById('submitVoteBtn').addEventListener('click', async () => {
@@ -717,15 +850,19 @@
                     return;
                 }
             } else {
-                if (selectedCandidates.length === 0) {
-                    alert('Please select at least one candidate');
+                if (Object.keys(selectedSecondaryByPosition).length === 0) {
+                    alert('Please select at least one vote');
                     return;
                 }
             }
 
+            const totalSecondaryVotes = currentElection.election_type === 'secondary_level'
+                ? Object.keys(selectedSecondaryByPosition).length : 0;
             const confirmMessage = selectedNota
                 ? 'Are you sure you want to submit NOTA (invalid vote)?'
-                : `Are you sure you want to submit your vote for ${selectedCandidates.length} candidate(s)?`;
+                : currentElection.election_type === 'secondary_level'
+                    ? `Are you sure you want to submit votes for ${totalSecondaryVotes} position(s)?`
+                    : `Are you sure you want to submit your vote for ${selectedCandidates.length} candidate(s)?`;
 
             if (!confirm(confirmMessage)) {
                 return;
@@ -733,6 +870,7 @@
 
             try {
                 if (selectedNota) {
+                    // Class-level NOTA
                     const voteResponse = await fetch(`${API_URL}/api/vote/cast`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -750,7 +888,38 @@
                     if (!voteData.success) {
                         throw new Error(voteData.error || 'Failed to cast NOTA vote');
                     }
+                } else if (currentElection.election_type === 'secondary_level') {
+                    // Secondary: submit per-position votes (candidate or NOTA)
+                    for (const [pos, selection] of Object.entries(selectedSecondaryByPosition)) {
+                        let payload;
+                        if (selection === 'nota') {
+                            payload = {
+                                voter_id: currentStudent.id,
+                                election_id: currentElection._id,
+                                is_nota: true,
+                                position: pos
+                            };
+                        } else {
+                            payload = {
+                                voter_id: currentStudent.id,
+                                candidate_id: selection,
+                                election_id: currentElection._id,
+                                position: pos
+                            };
+                        }
+                        const voteResponse = await fetch(`${API_URL}/api/vote/cast`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const voteData = await voteResponse.json();
+                        console.log('[VOTING] Vote cast response:', voteData);
+                        if (!voteData.success) {
+                            throw new Error(voteData.error || 'Failed to cast vote');
+                        }
+                    }
                 } else {
+                    // Class-level candidate votes
                     for (const candidateId of selectedCandidates) {
                         const card = document.querySelector(`.candidate-card[data-candidate-id="${candidateId}"]`);
                         const position = card ? card.getAttribute('data-position') : null;

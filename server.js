@@ -874,26 +874,45 @@ app.post('/api/vote/cast',
         return res.status(400).json({ error: 'candidate_id is required for candidate votes' });
       }
 
-      if (isNotaVote && election.election_type !== 'class_level') {
-        return res.status(400).json({ error: 'NOTA is available only for class-level election.' });
-      }
-
       const existingVotes = await Vote.find({ voter_id, election_id }).lean().exec();
       const hasExistingNota = existingVotes.some(v => v.vote_type === 'nota');
       const candidateVoteCount = existingVotes.filter(v => v.vote_type !== 'nota').length;
 
       if (isNotaVote) {
-        if (existingVotes.length > 0) {
-          return res.status(400).json({ error: 'NOTA must be submitted without any other votes.' });
-        }
+        if (election.election_type === 'class_level') {
+          if (existingVotes.length > 0) {
+            return res.status(400).json({ error: 'NOTA must be submitted without any other votes.' });
+          }
+          const vote = await Vote.create({
+            voter_id,
+            election_id,
+            vote_type: 'nota',
+            position: 'class_level_nota'
+          });
+          return res.json({ success: true, vote });
+        } else if (election.election_type === 'secondary_level') {
+          const rep = await ElectedRepresentative.findOne({ student_id: voter_id }).populate('election_id').lean().exec();
+          if (!rep || !rep.election_id || rep.election_id.election_type !== 'class_level') {
+            return res.status(403).json({ error: 'Only elected class representatives can vote in secondary election.' });
+          }
 
-        const vote = await Vote.create({
-          voter_id,
-          election_id,
-          vote_type: 'nota',
-          position: 'class_level_nota'
-        });
-        return res.json({ success: true, vote });
+          if (!position) {
+            return res.status(400).json({ error: 'Position is required for secondary-level NOTA vote.' });
+          }
+          const alreadyVotedForPosition = existingVotes.some(v => v.position === position);
+          if (alreadyVotedForPosition) {
+            return res.status(400).json({ error: `You have already voted for ${position}.` });
+          }
+          const vote = await Vote.create({
+            voter_id,
+            election_id,
+            vote_type: 'nota',
+            position
+          });
+          return res.json({ success: true, vote });
+        } else {
+          return res.status(400).json({ error: 'NOTA is not supported for this election type.' });
+        }
       }
 
       const candidate = await Candidate.findById(candidate_id).populate('student_id').lean().exec();
@@ -939,7 +958,7 @@ app.post('/api/vote/cast',
         }).populate('candidate_id').lean().exec();
         
         const alreadyVotedForPosition = existingVotesForPosition.some(
-          vote => vote.candidate_id && vote.candidate_id.position === candidate.position
+          vote => vote.position === candidate.position
         );
         
         if (alreadyVotedForPosition) {
