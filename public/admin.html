@@ -76,14 +76,6 @@
                     </div>
                 </div>
             </div>
-            <div class="col-12">
-                <div id="electionDebug" class="alert alert-secondary d-none" role="alert" style="font-size: 0.9rem">
-                    <strong>Election Debug:</strong>
-                    <span id="debugElectionId">ID: -</span> |
-                    <span id="debugElectionStatus">Status: -</span> |
-                    <span id="debugElectionClass">Class: -</span>
-                </div>
-            </div>
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-body stat-card text-primary">
@@ -240,6 +232,7 @@
                 const className = (currentUser.class_name || '').trim();
                 const url = `${API_URL}/api/election/status/class_level?class_name=${encodeURIComponent(className)}`;
                 console.log('[ADMIN] 🔍 Checking election active status for class:', className);
+                const statusEl = document.getElementById('electionStatus');
                 
                 const response = await fetch(url, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
                 if (!response.ok) {
@@ -253,6 +246,8 @@
                 if (!data || !data.election) {
                     console.log('[ADMIN] ⏳ No election found');
                     currentElection = null;
+                    statusEl.textContent = 'Not Started';
+                    statusEl.className = 'text-secondary';
                     return;
                 }
 
@@ -271,17 +266,16 @@
                     class_name: currentElection.class_name,
                     type: currentElection.election_type
                 });
-                
-                // Update debug banner
-                const dbg = document.getElementById('electionDebug');
-                const dbgId = document.getElementById('debugElectionId');
-                const dbgStatus = document.getElementById('debugElectionStatus');
-                const dbgClass = document.getElementById('debugElectionClass');
-                if (dbg && dbgId && dbgStatus && dbgClass) {
-                    dbg.classList.remove('d-none');
-                    dbgId.textContent = `ID: ${currentElection._id ?? '-'}`;
-                    dbgStatus.textContent = `Status: ${currentElection.status ?? '-'}`;
-                    dbgClass.textContent = `Class: ${currentElection.class_name ?? 'GLOBAL'}`;
+
+                if (currentElection.status === 'ongoing') {
+                    statusEl.textContent = 'Ongoing';
+                    statusEl.className = 'text-success';
+                } else if (currentElection.status === 'ended') {
+                    statusEl.textContent = 'Ended';
+                    statusEl.className = 'text-danger';
+                } else {
+                    statusEl.textContent = 'Not Started';
+                    statusEl.className = 'text-secondary';
                 }
 
                 // If election status is ongoing, load candidates (but don't auto-redirect)
@@ -536,6 +530,9 @@
                         container.innerHTML = `
                             <div class="alert alert-success">
                                 <i class="bi bi-check-circle"></i> Election has ended. Results:
+                            </div>
+                            <div class="alert alert-warning">
+                                <i class="bi bi-slash-circle"></i> NOTA total count: <strong>${data.nota_count || 0}</strong>
                             </div>
                             <table class="table table-striped">
                                 <thead>

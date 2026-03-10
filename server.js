@@ -322,7 +322,13 @@ app.post('/api/election/end', authenticateJWT, requireRole('super_admin'),
       
       // Aggregate votes for each candidate
       const voteAggregation = await Vote.aggregate([
-        { $match: { election_id: new mongoose.Types.ObjectId(election_id) } },
+        {
+          $match: {
+            election_id: new mongoose.Types.ObjectId(election_id),
+            vote_type: { $ne: 'nota' },
+            candidate_id: { $ne: null }
+          }
+        },
         { $group: { _id: '$candidate_id', vote_count: { $sum: 1 } } }
       ]);
       
@@ -821,6 +827,11 @@ app.get('/api/candidates/:electionId', async (req, res) => {
     if (election.election_type === 'class_level' && classNameFilter) {
       candidates = candidates.filter(c => c.student_id && (c.student_id.class_name || '').toLowerCase() === classNameFilter);
     }
+
+    const nota_count = await Vote.countDocuments({
+      election_id: electionId,
+      vote_type: 'nota'
+    }).exec();
     
     console.log('[CANDIDATES] Found candidates:', candidates.length, 'for election_id:', electionId);
     if (candidates.length === 0) {
@@ -833,7 +844,7 @@ app.get('/api/candidates/:electionId', async (req, res) => {
       });
     }
     
-    res.json({ candidates });
+    res.json({ candidates, nota_count: nota_count || 0 });
   } catch (error) {
     console.error('[CANDIDATES] Fetch error:', error);
     res.status(500).json({ error: error.message });
@@ -842,18 +853,47 @@ app.get('/api/candidates/:electionId', async (req, res) => {
 
 app.post('/api/vote/cast',
   body('voter_id').isString().notEmpty(),
-  body('candidate_id').isString().notEmpty(),
+  body('candidate_id').optional().isString().notEmpty(),
   body('election_id').isString().notEmpty(),
+  body('is_nota').optional().isBoolean(),
+  body('position').optional().isString(),
   async (req, res) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ error: 'Validation failed', details: errors.array() });
-      const { voter_id, candidate_id, election_id } = req.body;
+      const { voter_id, candidate_id, election_id, is_nota, position } = req.body;
+      const isNotaVote = is_nota === true;
       
       // Get election to check type
       const election = await Election.findById(election_id).lean().exec();
       if (!election) {
         return res.status(404).json({ error: 'Election not found' });
+      }
+
+      if (!isNotaVote && !candidate_id) {
+        return res.status(400).json({ error: 'candidate_id is required for candidate votes' });
+      }
+
+      if (isNotaVote && election.election_type !== 'class_level') {
+        return res.status(400).json({ error: 'NOTA is available only for class-level election.' });
+      }
+
+      const existingVotes = await Vote.find({ voter_id, election_id }).lean().exec();
+      const hasExistingNota = existingVotes.some(v => v.vote_type === 'nota');
+      const candidateVoteCount = existingVotes.filter(v => v.vote_type !== 'nota').length;
+
+      if (isNotaVote) {
+        if (existingVotes.length > 0) {
+          return res.status(400).json({ error: 'NOTA must be submitted without any other votes.' });
+        }
+
+        const vote = await Vote.create({
+          voter_id,
+          election_id,
+          vote_type: 'nota',
+          position: 'class_level_nota'
+        });
+        return res.json({ success: true, vote });
       }
 
       const candidate = await Candidate.findById(candidate_id).populate('student_id').lean().exec();
@@ -864,11 +904,13 @@ app.post('/api/vote/cast',
       if (String(candidate.election_id) !== String(election_id)) {
         return res.status(400).json({ error: 'Candidate does not belong to this election' });
       }
-      
-      const existingCount = await Vote.countDocuments({ voter_id, election_id }).exec();
-      
-      // For class-level: max 2 votes
-      if (election.election_type === 'class_level' && existingCount >= 2) {
+
+      if (election.election_type === 'class_level' && hasExistingNota) {
+        return res.status(400).json({ error: 'You already submitted NOTA for this election.' });
+      }
+
+      // For class-level: exactly 2 candidate votes max
+      if (election.election_type === 'class_level' && candidateVoteCount >= 2) {
         return res.status(400).json({ error: 'Maximum 2 votes allowed per election' });
       }
 
@@ -907,7 +949,13 @@ app.post('/api/vote/cast',
         }
       }
 
-      const vote = await Vote.create({ voter_id, candidate_id, election_id });
+      const vote = await Vote.create({
+        voter_id,
+        candidate_id,
+        election_id,
+        vote_type: 'candidate',
+        position: position || candidate.position || null
+      });
       await Candidate.findByIdAndUpdate(candidate_id, { $inc: { vote_count: 1 } }).exec();
       res.json({ success: true, vote });
     } catch (error) {
@@ -920,8 +968,24 @@ app.post('/api/vote/cast',
 app.post('/api/vote/count', async (req, res) => {
   try {
     const { voter_id, election_id } = req.body;
-    const vote_count = await Vote.countDocuments({ voter_id, election_id }).exec();
-    res.json({ vote_count: vote_count || 0 });
+    const votes = await Vote.find({ voter_id, election_id }).lean().exec();
+    const vote_count = votes.length;
+    const nota_count = votes.filter(v => v.vote_type === 'nota').length;
+    const candidate_vote_count = vote_count - nota_count;
+    const votes_by_position = {};
+
+    for (const vote of votes) {
+      if (vote.position) {
+        votes_by_position[vote.position] = (votes_by_position[vote.position] || 0) + 1;
+      }
+    }
+
+    res.json({
+      vote_count: vote_count || 0,
+      candidate_vote_count: candidate_vote_count || 0,
+      nota_count: nota_count || 0,
+      votes_by_position
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -931,7 +995,8 @@ app.get('/api/results/:electionId', async (req, res) => {
   try {
     const { electionId } = req.params;
     const results = await Candidate.find({ election_id: electionId }).populate('student_id').sort({ vote_count: -1 }).lean().exec();
-    res.json({ results });
+    const nota_count = await Vote.countDocuments({ election_id: electionId, vote_type: 'nota' }).exec();
+    res.json({ results, nota_count: nota_count || 0 });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -959,12 +1024,14 @@ app.get('/api/results/class/all', async (req, res) => {
       }
 
       for (const className of Object.keys(groupedByClass)) {
+        const nota_count = await Vote.countDocuments({ election_id: election._id, vote_type: 'nota' }).exec();
         results.push({
           election: {
             ...election,
             class_name: className
           },
-          candidates: groupedByClass[className].sort((a, b) => b.vote_count - a.vote_count)
+          candidates: groupedByClass[className].sort((a, b) => b.vote_count - a.vote_count),
+          nota_count: nota_count || 0
         });
       }
     }
@@ -985,7 +1052,8 @@ app.get('/api/results/secondary/all', async (req, res) => {
         .sort({ position: 1, vote_count: -1 })
         .lean()
         .exec();
-      results.push({ election, candidates });
+      const nota_count = await Vote.countDocuments({ election_id: election._id, vote_type: 'nota' }).exec();
+      results.push({ election, candidates, nota_count: nota_count || 0 });
     }
     res.json({ results });
   } catch (error) {

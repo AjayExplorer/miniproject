@@ -97,7 +97,7 @@
             <div class="card-body">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i>
-                    <strong>Instructions:</strong> You can vote for up to 2 candidates. Click on the candidates to select them.
+                    <strong>Instructions:</strong> Class-level: vote exactly 2 candidates or select NOTA. Secondary-level: one vote per position.
                 </div>
                 <div id="candidatesContainer">
                     <p class="text-center text-muted">Loading candidates...</p>
@@ -153,6 +153,8 @@
         let currentStudent = null;
         let currentElection = null;
         let selectedCandidates = [];
+        let selectedSecondaryByPosition = {};
+        let selectedNota = false;
         let stream = null;
         let verificationAttempts = 0;
         let adminUser = null;
@@ -519,6 +521,10 @@
                     console.log('[VOTING] ✅ Student is an elected representative, can vote');
                 }
                 candidatesLoadAttempts++;
+                selectedCandidates = [];
+                selectedSecondaryByPosition = {};
+                selectedNota = false;
+                document.getElementById('submitVoteBtn').disabled = true;
 
                 // Check if student has already voted
                 const voteCountResponse = await fetch(`${API_URL}/api/vote/count`, {
@@ -533,10 +539,12 @@
                 const voteCountData = await voteCountResponse.json();
                 console.log('[VOTING] Current vote count:', voteCountData.vote_count);
 
-                if (voteCountData.vote_count >= 2) {
-                    alert('You have already cast your votes!');
-                    showStep(4);
-                    return;
+                if (currentElection.election_type === 'class_level') {
+                    if ((voteCountData.candidate_vote_count || 0) >= 2 || (voteCountData.nota_count || 0) >= 1) {
+                        alert('You have already cast your vote(s)!');
+                        showStep(4);
+                        return;
+                    }
                 }
 
                 const classFilter = currentElection.election_type === 'class_level'
@@ -561,8 +569,13 @@
                     container.innerHTML = data.candidates.map(candidate => {
                         const candidateId = candidate._id;
                         const student = candidate.student_id;
+                        const position = candidate.position || 'general';
                         return `
-                        <div class="candidate-card" onclick="toggleCandidate('${candidateId}', this)">
+                        <div class="candidate-card"
+                             data-candidate-id="${candidateId}"
+                             data-position="${position}"
+                             data-is-nota="false"
+                             onclick="toggleCandidate(this)">
                             <div class="candidate-info">
                                 <div class="candidate-name">
                                     <i class="bi bi-person-circle"></i> ${student ? student.name : 'N/A'}
@@ -577,6 +590,25 @@
                         </div>
                         `;
                     }).join('');
+
+                    if (currentElection.election_type === 'class_level') {
+                        container.insertAdjacentHTML('beforeend', `
+                            <div class="candidate-card border-warning"
+                                 data-candidate-id="nota"
+                                 data-position="class_level_nota"
+                                 data-is-nota="true"
+                                 onclick="toggleCandidate(this)">
+                                <div class="candidate-info">
+                                    <div class="candidate-name text-warning">
+                                        <i class="bi bi-slash-circle"></i> NOTA (None Of The Above)
+                                    </div>
+                                    <div class="candidate-admission">
+                                        Privacy vote. This is counted as an invalid vote.
+                                    </div>
+                                </div>
+                            </div>
+                        `);
+                    }
                 } else {
                     console.warn('[VOTING] ⚠️  No candidates found for election:', electionId);
                     
@@ -618,49 +650,128 @@
             }
         }
 
-        function toggleCandidate(candidateId, element) {
+        function toggleCandidate(element) {
+            const candidateId = element.getAttribute('data-candidate-id');
+            const position = element.getAttribute('data-position') || 'general';
+            const isNota = element.getAttribute('data-is-nota') === 'true';
+
+            if (currentElection && currentElection.election_type === 'class_level') {
+                if (isNota) {
+                    if (selectedNota) {
+                        selectedNota = false;
+                        element.classList.remove('selected');
+                    } else {
+                        selectedNota = true;
+                        selectedCandidates = [];
+                        document.querySelectorAll('.candidate-card.selected').forEach(card => card.classList.remove('selected'));
+                        element.classList.add('selected');
+                    }
+                    document.getElementById('submitVoteBtn').disabled = !(selectedNota || selectedCandidates.length === 2);
+                    return;
+                }
+
+                if (selectedNota) {
+                    selectedNota = false;
+                    document.querySelectorAll('.candidate-card[data-is-nota="true"]').forEach(card => card.classList.remove('selected'));
+                }
+
+                if (element.classList.contains('selected')) {
+                    element.classList.remove('selected');
+                    selectedCandidates = selectedCandidates.filter(id => id !== candidateId);
+                } else {
+                    if (selectedCandidates.length >= 2) {
+                        alert('You must vote for exactly 2 candidates in class-level election.');
+                        return;
+                    }
+                    element.classList.add('selected');
+                    selectedCandidates.push(candidateId);
+                }
+
+                document.getElementById('submitVoteBtn').disabled = !(selectedNota || selectedCandidates.length === 2);
+                return;
+            }
+
             if (element.classList.contains('selected')) {
                 element.classList.remove('selected');
                 selectedCandidates = selectedCandidates.filter(id => id !== candidateId);
+                if (selectedSecondaryByPosition[position] === candidateId) {
+                    delete selectedSecondaryByPosition[position];
+                }
             } else {
-                if (selectedCandidates.length >= 2) {
-                    alert('You can only select up to 2 candidates');
+                if (selectedSecondaryByPosition[position] && selectedSecondaryByPosition[position] !== candidateId) {
+                    alert('1 vote for each position');
                     return;
                 }
                 element.classList.add('selected');
                 selectedCandidates.push(candidateId);
+                selectedSecondaryByPosition[position] = candidateId;
             }
 
             document.getElementById('submitVoteBtn').disabled = selectedCandidates.length === 0;
         }
 
         document.getElementById('submitVoteBtn').addEventListener('click', async () => {
-            if (selectedCandidates.length === 0) {
-                alert('Please select at least one candidate');
-                return;
+            if (currentElection.election_type === 'class_level') {
+                if (!selectedNota && selectedCandidates.length !== 2) {
+                    alert('Class-level election requires exactly 2 candidate votes, or select NOTA.');
+                    return;
+                }
+            } else {
+                if (selectedCandidates.length === 0) {
+                    alert('Please select at least one candidate');
+                    return;
+                }
             }
 
-            if (!confirm(`Are you sure you want to submit your vote for ${selectedCandidates.length} candidate(s)?`)) {
+            const confirmMessage = selectedNota
+                ? 'Are you sure you want to submit NOTA (invalid vote)?'
+                : `Are you sure you want to submit your vote for ${selectedCandidates.length} candidate(s)?`;
+
+            if (!confirm(confirmMessage)) {
                 return;
             }
 
             try {
-                for (const candidateId of selectedCandidates) {
+                if (selectedNota) {
                     const voteResponse = await fetch(`${API_URL}/api/vote/cast`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             voter_id: currentStudent.id,
-                            candidate_id: candidateId,
-                            election_id: currentElection._id
+                            election_id: currentElection._id,
+                            is_nota: true,
+                            position: 'class_level_nota'
                         })
                     });
-                    
+
                     const voteData = await voteResponse.json();
-                    console.log('[VOTING] Vote cast response:', voteData);
-                    
+                    console.log('[VOTING] NOTA cast response:', voteData);
+
                     if (!voteData.success) {
-                        throw new Error(voteData.error || 'Failed to cast vote');
+                        throw new Error(voteData.error || 'Failed to cast NOTA vote');
+                    }
+                } else {
+                    for (const candidateId of selectedCandidates) {
+                        const card = document.querySelector(`.candidate-card[data-candidate-id="${candidateId}"]`);
+                        const position = card ? card.getAttribute('data-position') : null;
+
+                        const voteResponse = await fetch(`${API_URL}/api/vote/cast`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                voter_id: currentStudent.id,
+                                candidate_id: candidateId,
+                                election_id: currentElection._id,
+                                position
+                            })
+                        });
+
+                        const voteData = await voteResponse.json();
+                        console.log('[VOTING] Vote cast response:', voteData);
+
+                        if (!voteData.success) {
+                            throw new Error(voteData.error || 'Failed to cast vote');
+                        }
                     }
                 }
 
