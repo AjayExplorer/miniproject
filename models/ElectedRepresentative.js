@@ -1,3 +1,5 @@
+// Study Note:
+// Stores class-level winners who become eligible representatives for secondary elections.
 import mongoose from 'mongoose';
 const { Schema, model, Types } = mongoose;
 

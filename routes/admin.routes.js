@@ -1,3 +1,5 @@
+// Study Note:
+// Admin management routes (create/list) with auth and role guards.
 import { Router } from 'express';
 import { authenticateJWT, requireRole } from '../middleware/auth.js';
 import { createAdmin, listAdmins } from '../controllers/admin.controller.js';

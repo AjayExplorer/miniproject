@@ -1,3 +1,7 @@
+// Study Note:
+// This is the main monolithic backend entry file.
+// It initializes Express + MongoDB, defines all core API endpoints,
+// handles election lifecycle, voting, verification, and serves frontend pages.
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';

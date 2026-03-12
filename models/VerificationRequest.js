@@ -1,3 +1,6 @@
+// Study Note:
+// Manual verification queue for students who fail face verification attempts.
+// Super admin resolves requests as approved or rejected.
 import mongoose from 'mongoose';
 const { Schema, model, Types } = mongoose;
 

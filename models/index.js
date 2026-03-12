@@ -1,3 +1,5 @@
+// Study Note:
+// Central model barrel file for convenient imports across controllers and routes.
 import Admin from './Admin.js';
 import Student from './Student.js';
 import Election from './Election.js';

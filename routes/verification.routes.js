@@ -1,3 +1,6 @@
+// Study Note:
+// Placeholder verification route in modular structure.
+// Real verification logic currently lives in server.js.
 import { Router } from 'express';
 
 const router = Router();

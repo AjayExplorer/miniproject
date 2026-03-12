@@ -1,3 +1,5 @@
+// Study Note:
+// Root API router for modular server; groups feature routes under /api.
 import { Router } from 'express';
 import authRoutes from './auth.routes.js';
 import electionRoutes from './election.routes.js';

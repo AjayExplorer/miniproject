@@ -1,3 +1,6 @@
+// Study Note:
+// Face recognition utility service.
+// Loads models, extracts 128-D embeddings from images, and compares embeddings.
 import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';

@@ -1,3 +1,6 @@
+// Study Note:
+// Student schema stores student identity, class, tutor ownership, and face embedding.
+// Uses compound unique index on (admission_no, class_name) for per-class uniqueness.
 import mongoose from 'mongoose';
 const { Schema, model, Types } = mongoose;
 

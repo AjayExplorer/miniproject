@@ -1,3 +1,8 @@
+// Study Note:
+// JWT security middleware.
+// - signToken: creates token for admin login
+// - authenticateJWT: validates Bearer token and loads current admin
+// - requireRole: enforces role-based access control
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import Admin from '../models/Admin.js';

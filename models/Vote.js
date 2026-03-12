@@ -1,3 +1,6 @@
+// Study Note:
+// Vote schema records each vote (candidate vote or NOTA) per election and position.
+// Includes unique index to prevent exact duplicate vote records.
 import mongoose from 'mongoose';
 const { Schema, model, Types } = mongoose;
 

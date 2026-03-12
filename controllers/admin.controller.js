@@ -1,3 +1,5 @@
+// Study Note:
+// Admin controller provides create/list operations for admin accounts.
 import { Admin } from '../models/index.js';
 
 export async function createAdmin(req, res) {

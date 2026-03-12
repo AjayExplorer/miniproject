@@ -1,3 +1,5 @@
+// Study Note:
+// Election controller exposes election status lookup logic for modular routes.
 import { Election } from '../models/index.js';
 
 export async function getElectionStatus(req, res) {

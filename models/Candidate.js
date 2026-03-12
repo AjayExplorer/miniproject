@@ -1,3 +1,5 @@
+// Study Note:
+// Candidate schema links a student to an election with position, vote count, and winner flag.
 import mongoose from 'mongoose';
 const { Schema, model, Types } = mongoose;
 

@@ -1,3 +1,5 @@
+// Study Note:
+// Modular server app setup: middleware, DB connection, route mounting, and health check.
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';

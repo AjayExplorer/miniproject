@@ -1,3 +1,6 @@
+// Study Note:
+// Admin schema for system operators (super admin, tutor admin, staff advisor).
+// Includes password hashing hook and password comparison helper.
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 const { Schema, model } = mongoose;

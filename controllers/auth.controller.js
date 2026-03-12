@@ -1,3 +1,5 @@
+// Study Note:
+// Auth controller handles admin login and JWT token issuance.
 import { signToken } from '../middleware/auth.js';
 import { Admin } from '../models/index.js';
 

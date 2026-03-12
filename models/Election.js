@@ -1,3 +1,5 @@
+// Study Note:
+// Election schema tracks election type, optional class scope, status, and timing data.
 import mongoose from 'mongoose';
 const { Schema, model, Types } = mongoose;
 

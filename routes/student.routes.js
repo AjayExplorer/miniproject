@@ -1,3 +1,6 @@
+// Study Note:
+// Placeholder student route in modular structure.
+// Real student logic currently lives in server.js.
 import { Router } from 'express';
 
 const router = Router();

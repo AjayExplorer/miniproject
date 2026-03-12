@@ -1,3 +1,5 @@
+// Study Note:
+// Election routes for modular server status endpoints.
 import { Router } from 'express';
 import { getElectionStatus } from '../controllers/election.controller.js';
 
